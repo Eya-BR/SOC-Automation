@@ -58,7 +58,9 @@ This project enhances the efficiency and effectiveness of SOC operations.
 
 - **Install Sysmon**  
    Run the Sysmon installer using powershell with administrative privileges and apply the configuration file that needs to be downloaded seperately to enable detailed event logging.
-   
+ ```bash
+.\Sysmon64.exe -i .\sysmonconfig.xml
+```  
 ![image](https://github.com/user-attachments/assets/54ff2b79-72cd-474f-8aa8-66d3f66d7379)
 
  - **Verify Installation**  
@@ -66,18 +68,26 @@ This project enhances the efficiency and effectiveness of SOC operations.
 
 ### Set Up Wazuh Server
 - To set up the Wazuh server, we will be using Azure, a popular cloud service provider. We start by deploying a new virtual machine:
-
+  
 ![image](https://github.com/user-attachments/assets/24722f2c-060c-44a3-9155-00aba3fc52f4)
 
 - Connect to the Wazuh Server via SSH 
-
+```bash
+ssh -i <sshkey.pem> <user@PublicIP>
+```
 ![image](https://github.com/user-attachments/assets/8bde1fae-32fc-431b-9f38-775c27e12eb5)
 
 - Install Wazuh:
 We start the Wazuh installation using the official Wazuh installer script:
-
+```bash
+curl -sO https://packages.wazuh.com/4.7/wazuh-install.sh && sudo bash ./wazuh-install.sh -a
+```
 ![image](https://github.com/user-attachments/assets/c197796b-447f-4cb5-9b98-5edfaecc3c30)
-
+We take note of the generated password for the "admin" user:
+```bash
+User: admin
+Password: *******************
+```
 - Access the Wazuh Web Interface:
 To log in to the Wazuh web interface, we open a web browser and enter the Wazuh server's public IP address with https:// prefix:
 
@@ -91,37 +101,72 @@ We deploy another virtual machine on Azure with Ubuntu 22.04 for hosting TheHive
 
 - **Install Dependencies:**
 We start by installing the necessary dependencies for TheHive:
-
+We take note of the generated password for the "admin" user:
+```bash
+apt install wget gnupg apt-transport-https git ca-certificates ca-certificates-java curl software-properties-common python3-pip lsb-release
+```
 ![image](https://github.com/user-attachments/assets/a4275ef2-be69-4ed8-86c7-29de013c2c6e)
 
 - **Install java:**
-
+```bash
+wget -qO- https://apt.corretto.aws/corretto.key | sudo gpg --dearmor -o /usr/share/keyrings/corretto.gpg
+echo "deb [signed-by=/usr/share/keyrings/corretto.gpg] https://apt.corretto.aws stable main" | sudo tee -a /etc/apt/sources.list.d/corretto.sources.list
+sudo apt update
+sudo apt install java-common java-11-amazon-corretto-jdk
+echo JAVA_HOME="/usr/lib/jvm/java-11-amazon-corretto" | sudo tee -a /etc/environment
+export JAVA_HOME="/usr/lib/jvm/java-11-amazon-corretto"
+```
 ![image](https://github.com/user-attachments/assets/43fb8bde-0673-4c27-a8db-07452a1f1d23)
-
 
 ### Install Cassandra 
 Cassandra is the database used by TheHive for storing data.
-
+```bash
+wget -qO - https://downloads.apache.org/cassandra/KEYS | sudo gpg --dearmor -o /usr/share/keyrings/cassandra-archive.gpg
+echo "deb [signed-by=/usr/share/keyrings/cassandra-archive.gpg] https://debian.cassandra.apache.org 40x main" | sudo tee -a /etc/apt/sources.list.d/cassandra.sources.list
+sudo apt update
+sudo apt install cassandra
+```
 ![image](https://github.com/user-attachments/assets/fa6c6c60-f822-4f65-bbed-d4a928354160)
 
 ### Install Elasticsearch
 Elasticsearch is used by TheHive for indexing and searching data.
-
+```bash
+wget -qO - https://artifacts.elastic.co/GPG-KEY-elasticsearch | sudo gpg --dearmor -o /usr/share/keyrings/elasticsearch-keyring.gpg
+sudo apt-get install apt-transport-https
+echo "deb [signed-by=/usr/share/keyrings/elasticsearch-keyring.gpg] https://artifacts.elastic.co/packages/7.x/apt stable main" | sudo tee /etc/apt/sources.list.d/elastic-7.x.list
+sudo apt update
+sudo apt install elasticsearch
+```
 ![image](https://github.com/user-attachments/assets/9ffc9d01-ea13-416b-bd60-2f8996574771)
-
+- **Elasticsearch Configuration:** : Create a **jvm.options** file under **/etc/elasticsearch/jvm.options.d** and add the following configurations to optimize Elasticsearch performance:
+```bash
+-Dlog4j2.formatMsgNoLookups=true
+-Xms2g
+-Xmx2g
+```
 ### Install TheHive 
-
+```bash
+wget -O- https://archives.strangebee.com/keys/strangebee.gpg | sudo gpg --dearmor -o /usr/share/keyrings/strangebee-archive-keyring.gpg
+echo 'deb [signed-by=/usr/share/keyrings/strangebee-archive-keyring.gpg] https://deb.strangebee.com thehive-5.2 main' | sudo tee -a /etc/apt/sources.list.d/strangebee.list
+sudo apt-get update
+sudo apt-get install -y thehive
+```
 ![image](https://github.com/user-attachments/assets/9dbce43d-127b-4bd1-92b1-4016954a5daf)
 ![image](https://github.com/user-attachments/assets/416fc989-1455-4b54-b241-25210b852b25)
 ![image](https://github.com/user-attachments/assets/1626c26b-555e-437e-9253-661d61881df4)
 
 - Default credentials for accessing TheHive on port 9000:
-
+```bash
+Username: admin@thehive.local
+Password: secret
+```
 ![image](https://github.com/user-attachments/assets/97599046-be1f-42f5-abcf-14f90417e93d)
 
 ### Configure TheHive and Wazuh
 - Configure Cassandra: Cassandra is TheHive's database. We need to configure it by modifying the cassandra.yaml file:
-  
+```bash
+nano /etc/cassandra/cassandra.yaml
+```  
 ![image](https://github.com/user-attachments/assets/a20f3496-ea2c-47d2-8701-43aacb4d1e92)
 
 - Set the listen_address to TheHive's public IP:
@@ -134,36 +179,56 @@ Elasticsearch is used by TheHive for indexing and searching data.
 ![image](https://github.com/user-attachments/assets/0b386fec-e1aa-4e9d-8915-6568e027fee9)
 
 - Restart and Check the Cassandra service status to ensure it's running:
-
+```bash
+Systemctl restart cassandra.service
+Systemctl status cassandra.service
+```
 ![image](https://github.com/user-attachments/assets/2286d51a-3892-425d-aa0e-c65b347ede2e)
 
 ### Configure Elasticsearch:
 - Elasticsearch is used for data indexing in TheHive. We need to configure it by modifying the elasticsearch.yml file:
-  
+```bash
+nano /etc/elasticsearch/elasticsearch.yml
+```  
 ![image](https://github.com/user-attachments/assets/9e12f44a-ec3b-453f-a27d-37f5ae7d1e36)
 ![image](https://github.com/user-attachments/assets/0d3d9df2-344d-463c-991c-5697fa70dd88)
 
 - Restart and Check the Elasticsearch service status:
-
+```bash
+Systemctl restart elasticsearch.service
+systemctl enable elasticsearch
+Systemctl status elasticsearch
+```
 ![image](https://github.com/user-attachments/assets/8efc2d6e-44cf-47c2-9615-e677d5119ed9)
 
 ### Configure TheHive:
 - Before configuring TheHive, ensure the thehive user and group have access to the necessary file paths:
-  
+```bash
+chown -R thehive:thehive /opt/thp
+ls -la /opt/thp
+```  
 ![image](https://github.com/user-attachments/assets/390576e8-d091-4b89-8ae0-af4cf4155a81)
 
 - Now, configure TheHive's configuration file:
+```bash
+nano /etc/thehive/application.conf
+```
 - Modify the database and index config sections. Change the hostname IP to TheHive's public IP. Set the cluster.name to the same value as the Cassandra cluster name ("SOAR" in this example). Change the index.search.hostname to TheHive's public IP. At the bottom, change the application.baseUrl to TheHive's public IP.
 
 ![image](https://github.com/user-attachments/assets/9fe248ff-fb96-4e88-bf76-3d3f93786c89)
 ![image](https://github.com/user-attachments/assets/ec2fa75e-1683-4a6d-b3af-47e142f979f1)
 
 - Save the file, Restart and check the TheHive service:
-
+```bash
+systemctl start thehive
+systemctl enable thehive
+```
 ![image](https://github.com/user-attachments/assets/60c10f66-aba5-47b8-8125-599102511253)
 
 - If all services are running, access TheHive from a web browser using TheHive's public IP and port 9000:
-
+```bash
+http://<PubIP>:9000/login
+```
 ![image](https://github.com/user-attachments/assets/4d0bdee1-ef36-4d97-8124-7983e1c8cfac)
 
 ### Configure Wazuh
@@ -188,7 +253,12 @@ Elasticsearch is used by TheHive for indexing and searching data.
 ### Configure Sysmon Event Forwarding to Wazuh
 - In the ossec.conf file, add a new <localfile> section to configure Sysmon event forwarding to Wazuh. Check the full name of the Sysmon event log in the Windows Event Viewer.
 - Add the following configuration to the ossec.conf file:
-
+```bash
+<localfile>
+<location>Microsoft-Windows-Sysmon/Operational</location>
+<log_format>eventchannel</log_format>
+</localfile>
+```
 ![image](https://github.com/user-attachments/assets/60bcaaea-6dbc-4f1b-a73e-e625900a14e3)
 
 - Restart the Wazuh agent service to apply the configuration changes.
@@ -214,7 +284,9 @@ Open PowerShell, navigate to the directory where Mimikatz is downloaded, and exe
 
 ### Configure Filebeat:
 - To enable Wazuh to ingest the archived logs, modify the Filebeat configuration: Archives should be set to true.
-
+```bash
+nano /etc/filebeat/filebeat.yml
+```
 
 ![image](https://github.com/user-attachments/assets/d0e64e47-b294-4028-a994-9cb55134fa02)
 
@@ -257,7 +329,16 @@ Open PowerShell, navigate to the directory where Mimikatz is downloaded, and exe
 
 - These are Sysmon-specific rules built into Wazuh for event ID 1. Copy one of these rules as a reference and modify it to create a custom Mimikatz detection rule.
 - Go to the "Custom rules" button and edit the "local_rules.xml" file. Add the custom Mimikatz detection rule.
-
+```bash
+<rule id="100002" level="15">
+  <if_group>sysmon_event1</if_group>
+  <field name="win.eventdata.originalFileName" type="pcre2">(?i)\\mimikatz\.exe</field>
+  <description>Mimikatz Usage Detected</description>
+  <mitre>
+    <id>T1003</id>
+  </mitre>
+</rule>
+```
 ![image](https://github.com/user-attachments/assets/73718505-7039-4a48-90f2-6b3bef392e71)
 
 - Save the file and restart the Wazuh manager service.
@@ -288,11 +369,23 @@ Open PowerShell, navigate to the directory where Mimikatz is downloaded, and exe
 ![image](https://github.com/user-attachments/assets/692bafef-8ec6-401c-b173-a2f275ee2d67)
 
 - Configure	Wazuh	to	Connect	to	Shuffle: On	the	Wazuh	manager	CLI,	modify the ossec.conf file to add an integration for Shuffle:
-
+```bash
+nano /var/ossec/etc/ossec.conf
+```
+```bash
+<integration>
+  <name>shuffle</name>
+  <hook_url>https://shuffler.io/api/v1/hooks/webhook_0af8a049-f2cb-420b-af58-5ebc3c40c7df</hook_url>
+  <level>3</level>
+  <alert_format>json</alert_format>
+</integration>
+```
 ![image](https://github.com/user-attachments/assets/57d1715a-498b-4d65-8a38-a1e2495f5738)
 
 - Restart the Wazuh manager service
-
+```bash
+systemctl restart wazuh-manager.service
+```
 ### Execute the malware:
 
 ![image](https://github.com/user-attachments/assets/3e2bbbfe-c9cf-4ceb-814a-d90659ed372f)
@@ -372,7 +465,9 @@ Workflow Steps:
 ![image](https://github.com/user-attachments/assets/7bdac402-a515-4259-8b54-a6565acaf041)
 
 - second let’s try to trigger the alert related to ssh brute force on wazuh by using a well know tool HYDRA to emulate an ssh brute force attack on the ubuntu machine:
-
+```bash
+hydra -l <User> -P password.txt ssh://<PubIP>
+```
 ![image](https://github.com/user-attachments/assets/de808dad-0a17-4a56-8310-f49feb64f381)
 
 - Check wazuh to see if there are any authentication failure logs or ssh brute force attack alerts generated:
@@ -385,7 +480,14 @@ Workflow Steps:
 
 - Now let’s continue with our shuffle workflow. Let’s send the alert to shuffle.
 - Let’s start by modifying the ossec.conf file to specify the alert to be send to shuffle:
-
+```bash
+<integration>
+  <name>shuffle</name>
+  <hook_url>https://shuffler.io/api/v1/hooks/webhook_0af8a049-f2cb-420b-af58-5ebc3c40c7df</hook_url>
+  <rule_id>5763</rule_id>
+  <alert_format>json</alert_format>
+</integration>
+```
 ![image](https://github.com/user-attachments/assets/0e91db13-b095-45db-ae1f-0de427248dd4)
 
 - Run the workflow and we should see the alert popped up in shuffle:
@@ -410,11 +512,20 @@ Workflow Steps:
 ![image](https://github.com/user-attachments/assets/8f1e55af-3044-4ac4-8a60-e7ae74f642d0)
 
 - Before proceeding with the workflow, we need to add active response commands to the Wazuh server to block the malicious IP addresses attempting to brute force the server. To do this, modify the file /var/ossec/etc/ossec.conf and add the following lines:
-
+```bash
+<active-response>
+<command>firewall-drop</command>
+<location>local</location>
+<level>5</level>
+<timeout>no</timeout>
+</active-response>
+```
 ![image](https://github.com/user-attachments/assets/0bdbedea-f1ff-48da-a1a3-67a5c480f312)
 
 - Test the active response by attempting to block the agent from connecting to the internet. Use the agent_control tool located in /var/ossec/bin/agent_control with the following command:
-
+```bash
+./agent_control -b 8.8.8.8 -f firewall-drop0 -u 001
+```
 ![image](https://github.com/user-attachments/assets/658c5b3f-0562-4eb5-bf19-cd97eef60f53)
 
 - To confirm if the command works, head to the Ubuntu machine and try to ping 8.8.8.8. Then, check the iptables rules with the following command :
@@ -450,9 +561,18 @@ Workflow Steps:
 
 ![image](https://github.com/user-attachments/assets/6e95d46d-8d47-40b7-bdc4-d5bb1c35d5f1)
 
+# Conclusion 
+This project highlights the efficiency and effectiveness of automating SOC workflows with tools like Wazuh, Shuffle, and TheHive. By integrating these technologies, we achieved rapid event detection, IOC enrichment, and consistent incident response, demonstrated through simulated malware and brute force attacks. The automation reduces manual workload, accelerates response times, and ensures scalable and reliable SOC operations. This repository serves as a comprehensive guide for implementing similar automation, contributing to stronger cybersecurity practices.
 
+# Project Perspective 
+This project demonstrates the potential for automating Security Operations Center (SOC) workflows using open-source tools. The modular design ensures scalability, allowing the addition of new machines, tools, or workflows without disrupting the system. Future enhancements could include integrating AI for advanced threat detection and decision-making. Continuous improvements, such as isolating infected machines or automating malware removal, are also planned to further enhance incident response. By documenting this workflow on GitHub, we aim to foster collaboration, knowledge sharing, and innovation in the cybersecurity community.
 
+# Acknowledgements 
+I extend my heartfelt gratitude to my colleagues, **Ghaith Madyouni** and **Mayssa Berradhia**, for their exceptional teamwork and unwavering dedication throughout this project. Their invaluable contributions played a pivotal role in its success, and I deeply appreciate their hard work and steadfast support.
 
+# References
+- https://www.mydfir.com/
+- https://github.com/uruc/SOC-Automation-Lab
 
 
 
