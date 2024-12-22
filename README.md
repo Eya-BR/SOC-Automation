@@ -1,4 +1,4 @@
-# SOC Automation
+![image](https://github.com/user-attachments/assets/252013a0-43b0-49a5-98e5-09d0db5b9a4e)# SOC Automation
 
 ## 1. Introduction
 
@@ -232,4 +232,254 @@ Open PowerShell, navigate to the directory where Mimikatz is downloaded, and exe
 - Go to the "Discover" section from the left-side menu and select the newly created index.
 
 ![image](https://github.com/user-attachments/assets/8ffc3ad9-9f4b-48cf-8d8b-3dac5380e1bc)
+
+### Troubleshoot Mimikatz Logs:
+- To troubleshoot if Mimikatz logs are being archived, use cat and grep on the archive logs in the Wazuh manager CLI:
+
+![image](https://github.com/user-attachments/assets/3e508ff4-c55e-44c8-9c43-5c76c7e6b521)
+
+### Relaunch Mimikatz:
+- Relaunch Mimikatz on the Windows client machine and check the Event Viewer to ensure Sysmon is capturing Mimikatz events.
+- Check the archive file again for Mimikatz logs to confirm they are being generated.
+
+![image](https://github.com/user-attachments/assets/5250a860-a53c-4517-a885-329add4da453)
+![image](https://github.com/user-attachments/assets/196d62fb-ca1d-4abb-a1b0-c0b277813bcb)
+![image](https://github.com/user-attachments/assets/d53ad9b5-de78-4237-aae4-4d8fa3a45c1b)
+
+### Create a Custom Mimikatz Alert
+- Let’s create a custom rule either from the CLI or the Wazuh web interface.
+
+![image](https://github.com/user-attachments/assets/3625b2c6-e25d-4fa3-872e-d440bd178f3a)
+
+- In the web interface, click on the "Manage rule files" button. Filter the rules by name ("sysmon") and view the rule details by clicking the eye icon.
+
+![image](https://github.com/user-attachments/assets/4c6bd237-973a-4c06-bec6-4c852e8cf53d)
+
+- These are Sysmon-specific rules built into Wazuh for event ID 1. Copy one of these rules as a reference and modify it to create a custom Mimikatz detection rule.
+- Go to the "Custom rules" button and edit the "local_rules.xml" file. Add the custom Mimikatz detection rule.
+
+![image](https://github.com/user-attachments/assets/73718505-7039-4a48-90f2-6b3bef392e71)
+
+- Save the file and restart the Wazuh manager service.
+
+### Test the Custom Rule:
+- To test the custom rule, rename the Mimikatz executable on the Windows client machine to something different.
+
+![image](https://github.com/user-attachments/assets/47e01ada-4e70-4c4d-8398-6516b76178f9)
+
+- Execute the renamed Mimikatz.
+
+![image](https://github.com/user-attachments/assets/4a182ba5-2454-4504-80fb-712c98627ad3)
+
+- Verify that the custom rule triggers an alert in Wazuh, even with the renamed Mimikatz executable.
+
+![image](https://github.com/user-attachments/assets/8340ad5a-dfb6-4bfe-b512-58eec90b0f13)
+
+## Automation with Shuffle and TheHive
+### Set Up Shuffle
+- Create a New Workflow: Click on "New Workflow" and create a workflow. You can select any random use case for demonstration purposes.
+
+![image](https://github.com/user-attachments/assets/e23185e0-73b1-498d-8831-852d371ba65d)
+![image](https://github.com/user-attachments/assets/de7b9dfd-b7fc-4d76-9886-5ead255a5655)
+
+### Add a Webhook Trigger:
+- On the workflow page, click on "Triggers" at the bottom left. Drag a "Webhook" trigger and connect it to the "Change Me" node. Set a name for the webhook and copy the Webhook URI from the right side. This URI will be added to the Ossec configuration on the Wazuh manager.
+
+![image](https://github.com/user-attachments/assets/692bafef-8ec6-401c-b173-a2f275ee2d67)
+
+- Configure	Wazuh	to	Connect	to	Shuffle: On	the	Wazuh	manager	CLI,	modify the ossec.conf file to add an integration for Shuffle:
+
+![image](https://github.com/user-attachments/assets/57d1715a-498b-4d65-8a38-a1e2495f5738)
+
+- Restart the Wazuh manager service
+
+### Execute the malware:
+
+![image](https://github.com/user-attachments/assets/3e2bbbfe-c9cf-4ceb-814a-d90659ed372f)
+
+### Test the Shuffle Integration:
+
+- Regenerate the Mimikatz telemetry on the Windows client machine. In Shuffle, click on the webhook trigger ("Wazuh-Alerts") and click "Start".
+
+![image](https://github.com/user-attachments/assets/91221100-b053-4f0a-b4fe-715af17d190e)
+
+## Build a Mimikatz Workflow 
+### Workflow Steps:
+
+1.	Mimikatz alert sent to Shuffle
+2.	Shuffle receives Mimikatz alert / extract SHA256 hash from file
+3.	Check reputation score with VirusTotal
+4.	Send details to TheHive to create an alert
+5.	Send an email to the SOC analyst to begin the investigation
+
+### Extract SHA256 Hash:
+- Observe that the return values for the hashes are appended by their hash type (sha1=hashvalue). To automate the workflow, parse out the hash value itself. Sending the entire value, including sha1= to VirusTotal will result in an invalid query.
+- Click on the "Change Me" node and select "Regex capture group" instead of "Repeat back to me". In the "Input data", select the "hashes" option. In the "Regex" tab, enter the regex pattern to parse the SHA256 hash value: SHA256=([0-9A-Fa-f]{64}). Save the workflow.
+
+![image](https://github.com/user-attachments/assets/1d78417c-f4c9-46e7-9a70-81b6f2ab3fcb)
+
+- Click on the "Show execution" button (running man icon) to verify that the hash value is extracted correctly.
+
+![image](https://github.com/user-attachments/assets/427236f3-7e95-4f86-8504-ec928c012aa8)
+
+### Integrate VirusTotal:
+- Create a VirusTotal account to access the API.
+- Copy the API key and return to Shuffle. In Shuffle, click on the "Apps" tab and search for "VirusTotal". Drag the "VirusTotal" app to the workflow, and it will automatically connect.
+
+![image](https://github.com/user-attachments/assets/3c59b0a5-84e8-44e8-aa28-9b9ab75570ec)
+
+- Enter the API key on the right side or click "Authenticate VirusTotal v3" to authenticate.
+
+![image](https://github.com/user-attachments/assets/d2af56a1-4588-4ce8-a3cd-fa5d45770ad2)
+
+- Change the "ID" field to the "SHA256Regex" value created earlier.
+- Expand the results to view the VirusTotal scan details, including the number of detections.
+
+![image](https://github.com/user-attachments/assets/cf539f4e-2ec7-4fa6-aa6e-9e6157c5c88c)
+
+- Under "Find actions", click on "TheHive" and select "Create alerts". Set the JSON payload for TheHive to receive the alerts.
+
+![image](https://github.com/user-attachments/assets/c72e5a56-2abc-4572-abe0-a5a477018a09)
+
+- Save the workflow and rerun it. An alert should appear in the TheHive dashboard.
+
+![image](https://github.com/user-attachments/assets/9726c4d2-9802-460f-986f-25549d2effb4)
+
+- Click on the alert to view the details.
+
+![image](https://github.com/user-attachments/assets/704297d5-b52a-4e6f-b4ce-88890a694b9c)
+
+### Send Email Notification:
+- In Shuffle, find "Email" in the "Apps" and connect VirusTotal to the email node.
+
+![image](https://github.com/user-attachments/assets/3cd60766-0da9-4758-9067-1794f2c76ac9)
+
+- Verify that the email is received with the expected alert details.
+
+![image](https://github.com/user-attachments/assets/4e34d85b-1f1d-410d-ac8a-bc9dee8098e0)
+
+## SSH Brute Force Attack Automation with Shuffle :
+### Build a SSH brute force response Workflow :
+
+Workflow Steps:
+1.	Ssh brute force alert sent to Shuffle
+2.	Shuffle receives ssh brute force alert / extract source ip address from file
+3.	Get nan ip report with VirusTotal
+4.	Send commands to wazuh to trigger the auto-response
+5.	Send an email to the SOC analyst to begin the investigation
+- First let’s add another agent (ubuntu machine) that will be our test subject
+
+![image](https://github.com/user-attachments/assets/7bdac402-a515-4259-8b54-a6565acaf041)
+
+- second let’s try to trigger the alert related to ssh brute force on wazuh by using a well know tool HYDRA to emulate an ssh brute force attack on the ubuntu machine:
+
+![image](https://github.com/user-attachments/assets/de808dad-0a17-4a56-8310-f49feb64f381)
+
+- Check wazuh to see if there are any authentication failure logs or ssh brute force attack alerts generated:
+
+![image](https://github.com/user-attachments/assets/57c335c7-50a1-4f80-95e8-4ad0af1aa878)
+
+- this dashboard indicates more than 80 authentication failures attempt on the ubuntu machine. And the alert has been generated successfully
+
+![image](https://github.com/user-attachments/assets/c6c9c8de-4753-4936-b1bd-1e16eb543453)
+
+- Now let’s continue with our shuffle workflow. Let’s send the alert to shuffle.
+- Let’s start by modifying the ossec.conf file to specify the alert to be send to shuffle:
+
+![image](https://github.com/user-attachments/assets/0e91db13-b095-45db-ae1f-0de427248dd4)
+
+- Run the workflow and we should see the alert popped up in shuffle:
+
+![image](https://github.com/user-attachments/assets/4f906a40-44be-413d-bd45-97c07dc12239)
+
+- Retrieve the HTTP application and modify its parameters to use curl and the appropriate URL in order to obtain the JSON Web Token (JWT), which will later be used to connect to Wazuh.
+
+![image](https://github.com/user-attachments/assets/849d24aa-9f1c-42cc-b5cd-a727b6097b31)
+
+- Connect virustotal to the workflow and change its parameter action  get an ip report and ip
+- specify source ip address from the available fields.
+
+![image](https://github.com/user-attachments/assets/0cb89d24-6801-478a-9638-c451041db712)
+
+- Test the workflow:
+
+![image](https://github.com/user-attachments/assets/1b014f24-9020-4925-90b1-173e76d6a92f)
+
+- Integrate Wazuh into the workflow by adding the Wazuh application. Configure it to retrieve the web token from the GET API we added earlier, and update the URL accordingly.
+
+![image](https://github.com/user-attachments/assets/8f1e55af-3044-4ac4-8a60-e7ae74f642d0)
+
+- Before proceeding with the workflow, we need to add active response commands to the Wazuh server to block the malicious IP addresses attempting to brute force the server. To do this, modify the file /var/ossec/etc/ossec.conf and add the following lines:
+
+![image](https://github.com/user-attachments/assets/0bdbedea-f1ff-48da-a1a3-67a5c480f312)
+
+- Test the active response by attempting to block the agent from connecting to the internet. Use the agent_control tool located in /var/ossec/bin/agent_control with the following command:
+
+![image](https://github.com/user-attachments/assets/658c5b3f-0562-4eb5-bf19-cd97eef60f53)
+
+- To confirm if the command works, head to the Ubuntu machine and try to ping 8.8.8.8. Then, check the iptables rules with the following command :
+
+![image](https://github.com/user-attachments/assets/7a7dd8d0-f67f-41ae-8294-85ec21c7a4c0)
+
+- The active response is successfully working.
+- Now let’s specify what we did in our shuffle workflow by modifying wazuh app parameters: 
+  - Command --> firewall-drop0
+  - Agent --> specify the agent id field
+  - Alerts --> specify the source ip to be blocked
+
+![image](https://github.com/user-attachments/assets/183a8ba8-6055-44a4-a026-33ebba1719e6)
+
+- Execute our workflow:
+
+![image](https://github.com/user-attachments/assets/d40843df-1ee3-4d10-b0fa-e20b3b626f79)
+
+- The workflow is working. Let's further verify it by going to the Wazuh web application to check the generated logs.
+
+![image](https://github.com/user-attachments/assets/4ffaa523-1bd8-4e2e-95ce-ff363fc34e15)
+![image](https://github.com/user-attachments/assets/d545ec12-296c-4101-9aa2-d222be7df58a)
+
+- Finally, Add the email application in order to notify the SOC analyst.
+
+![image](https://github.com/user-attachments/assets/449bf6e6-9a48-44f8-ae2d-3ebc87345ff2)
+
+- Execute the workflow :
+
+![image](https://github.com/user-attachments/assets/e5b38479-6810-4f47-aa8f-8b991eaaa19c)
+
+- Email sent successfully.
+
+![image](https://github.com/user-attachments/assets/6e95d46d-8d47-40b7-bdc4-d5bb1c35d5f1)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
