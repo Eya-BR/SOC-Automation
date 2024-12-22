@@ -1,4 +1,4 @@
-![image](https://github.com/user-attachments/assets/252013a0-43b0-49a5-98e5-09d0db5b9a4e)# SOC Automation
+# SOC Automation
 
 ## 1. Introduction
 
